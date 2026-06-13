@@ -3,7 +3,7 @@
 import aj from "@/lib/arcjet";
 import { db } from "@/lib/prisma";
 import { request } from "@arcjet/next";
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 
 const serializeTransaction = (obj) => {
@@ -18,20 +18,15 @@ const serializeTransaction = (obj) => {
 };
 
 export async function getUserAccounts() {
-  const { userId } = await auth();
+  const session = await auth();
+  const userId = session?.user?.id;
   if (!userId) throw new Error("Unauthorized");
 
-  const user = await db.user.findUnique({
-    where: { clerkUserId: userId },
-  });
-
-  if (!user) {
-    throw new Error("User not found");
-  }
+  
 
   try {
     const accounts = await db.account.findMany({
-      where: { userId: user.id },
+      where: { userId: userId },
       orderBy: { createdAt: "desc" },
       include: {
         _count: {
@@ -53,7 +48,8 @@ export async function getUserAccounts() {
 
 export async function createAccount(data) {
   try {
-    const { userId } = await auth();
+    const session = await auth();
+  const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
     // Get request data for ArcJet
@@ -82,13 +78,7 @@ export async function createAccount(data) {
       throw new Error("Request blocked");
     }
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    
 
     // Convert balance to float before saving
     const balanceFloat = parseFloat(data.balance);
@@ -98,7 +88,7 @@ export async function createAccount(data) {
 
     // Check if this is the user's first account
     const existingAccounts = await db.account.findMany({
-      where: { userId: user.id },
+      where: { userId: userId },
     });
 
     // If it's the first account, make it default regardless of user input
@@ -109,7 +99,7 @@ export async function createAccount(data) {
     // If this account should be default, unset other default accounts
     if (shouldBeDefault) {
       await db.account.updateMany({
-        where: { userId: user.id, isDefault: true },
+        where: { userId: userId, isDefault: true },
         data: { isDefault: false },
       });
     }
@@ -119,7 +109,7 @@ export async function createAccount(data) {
       data: {
         ...data,
         balance: balanceFloat,
-        userId: user.id,
+        userId: userId,
         isDefault: shouldBeDefault, // Override the isDefault based on our logic
       },
     });
@@ -135,20 +125,15 @@ export async function createAccount(data) {
 }
 
 export async function getDashboardData() {
-  const { userId } = await auth();
+  const session = await auth();
+  const userId = session?.user?.id;
   if (!userId) throw new Error("Unauthorized");
 
-  const user = await db.user.findUnique({
-    where: { clerkUserId: userId },
-  });
-
-  if (!user) {
-    throw new Error("User not found");
-  }
+  
 
   // Get all user transactions
   const transactions = await db.transaction.findMany({
-    where: { userId: user.id },
+    where: { userId: userId },
     orderBy: { date: "desc" },
   });
 

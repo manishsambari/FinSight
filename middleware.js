@@ -1,12 +1,7 @@
 import arcjet, { detectBot, shield } from "@arcjet/next";
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import NextAuth from "next-auth";
+import { authConfig } from "./auth.config";
 import { NextResponse } from "next/server";
-
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/account(.*)",
-  "/transaction(.*)",
-]);
 
 // Create Arcjet instance
 const aj = arcjet({
@@ -25,8 +20,7 @@ const aj = arcjet({
   ],
 });
 
-// Export Clerk middleware as primary middleware
-export default clerkMiddleware(async (auth, req) => {
+export default NextAuth(authConfig).auth(async (req) => {
   // Run Arcjet protection first
   const decision = await aj.protect(req);
   
@@ -37,14 +31,7 @@ export default clerkMiddleware(async (auth, req) => {
     );
   }
 
-  // Then handle Clerk authentication
-  const { userId } = await auth();
-
-  if (!userId && isProtectedRoute(req)) {
-    const { redirectToSignIn } = await auth();
-    return redirectToSignIn();
-  }
-
+  // NextAuth automatically handles route protection via authConfig.callbacks.authorized
   return NextResponse.next();
 });
 

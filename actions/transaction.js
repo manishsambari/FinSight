@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { auth } from "@/auth";
 import { db } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -17,7 +17,8 @@ const serializeAmount = (obj) => ({
 // Create Transaction
 export async function createTransaction(data) {
   try {
-    const { userId } = await auth();
+    const session = await auth();
+  const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
     // Get request data for ArcJet
@@ -46,18 +47,12 @@ export async function createTransaction(data) {
       throw new Error("Request blocked");
     }
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    
 
     const account = await db.account.findUnique({
       where: {
         id: data.accountId,
-        userId: user.id,
+        userId: userId,
       },
     });
 
@@ -74,7 +69,7 @@ export async function createTransaction(data) {
       const newTransaction = await tx.transaction.create({
         data: {
           ...data,
-          userId: user.id,
+          userId: userId,
           nextRecurringDate:
             data.isRecurring && data.recurringInterval
               ? calculateNextRecurringDate(data.date, data.recurringInterval)
@@ -100,19 +95,14 @@ export async function createTransaction(data) {
 }
 
 export async function getTransaction(id) {
-  const { userId } = await auth();
+  const session = await auth();
+  const userId = session?.user?.id;
   if (!userId) throw new Error("Unauthorized");
-
-  const user = await db.user.findUnique({
-    where: { clerkUserId: userId },
-  });
-
-  if (!user) throw new Error("User not found");
 
   const transaction = await db.transaction.findUnique({
     where: {
       id,
-      userId: user.id,
+      userId: userId,
     },
   });
 
@@ -123,20 +113,15 @@ export async function getTransaction(id) {
 
 export async function updateTransaction(id, data) {
   try {
-    const { userId } = await auth();
+    const session = await auth();
+  const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
-
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
-    if (!user) throw new Error("User not found");
 
     // Get original transaction to calculate balance change
     const originalTransaction = await db.transaction.findUnique({
       where: {
         id,
-        userId: user.id,
+        userId: userId,
       },
       include: {
         account: true,
@@ -161,7 +146,7 @@ export async function updateTransaction(id, data) {
       const updated = await tx.transaction.update({
         where: {
           id,
-          userId: user.id,
+          userId: userId,
         },
         data: {
           ...data,
@@ -197,20 +182,15 @@ export async function updateTransaction(id, data) {
 // Get User Transactions
 export async function getUserTransactions(query = {}) {
   try {
-    const { userId } = await auth();
+    const session = await auth();
+  const userId = session?.user?.id;
     if (!userId) throw new Error("Unauthorized");
 
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    
 
     const transactions = await db.transaction.findMany({
       where: {
-        userId: user.id,
+        userId: userId,
         ...query,
       },
       include: {
