@@ -2,7 +2,8 @@
   "build": {
     "env": {
       "NODE_ENV": "production"
-    }
+    },
+    "npmFlags": "--legacy-peer-deps"
   }
 }
 
